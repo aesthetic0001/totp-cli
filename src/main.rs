@@ -66,8 +66,14 @@ impl TotpHotp for Key {
 }
 
 fn main() {
+    let install_dir = dirs::home_dir().unwrap().join(".totp");
+    if !install_dir.exists() {
+        println!("Creating directory {:?}!", install_dir);
+        std::fs::create_dir_all(&install_dir).unwrap();
+    }
     let args = Args::parse();
-    let saved = std::fs::read_to_string("2fa.json").unwrap_or_default();
+    let save_path = install_dir.join("2fa.json");
+    let saved = std::fs::read_to_string(&save_path).unwrap_or_default();
     let mut accounts: HashMap<String, Key> = serde_json::from_str(&saved).unwrap_or_default();
 
     match args.cmd {
@@ -78,7 +84,7 @@ fn main() {
             }
             accounts.insert(name, Key { secret: key, size, period });
             let json = serde_json::to_string(&accounts).unwrap();
-            std::fs::write("2fa.json", json).unwrap();
+            std::fs::write(&save_path, json).unwrap();
             println!("TOTP added!");
         },
         SubCommand::Remove { name } => {
@@ -87,7 +93,7 @@ fn main() {
                 return;
             }
             let json = serde_json::to_string(&accounts).unwrap();
-            std::fs::write("2fa.json", json).unwrap();
+            std::fs::write(&save_path, json).unwrap();
             println!("TOTP removed!");
         },
         SubCommand::List {} => {

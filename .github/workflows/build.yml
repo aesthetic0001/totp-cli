@@ -17,10 +17,24 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
       - name: Build
-        run: cargo build --release --verbose
-      - name: Upload Release
-        uses: actions/upload-artifact@v4
+        run: cargo build --release
+      - name: Create release
+        id: release
+        uses: actions/create-release@v1
+        if: ${{ github.ref == 'refs/heads/main' }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          name: ${{ runner.os }}-build
-#          handle .exe extension on windows
-          path: target/release/${{ runner.os == 'Windows' && 'totp.exe' || 'totp' }}
+          tag_name: github-build-${{ github.run_number }}
+          release_name: Build ${{ github.run_number }}
+          body: Build for run \#${{ github.run_number }}
+      - name: Upload Build
+        uses: actions/upload-release-asset@v1
+        if: ${{ github.ref == 'refs/heads/main' }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.release.outputs.upload_url }}
+          asset_path: target/release/${{ runner.os == 'Windows' && 'totp.exe' || 'totp' }}
+          asset_name: totp-${{ runner.os == 'Windows' && 'windows.exe' || runner.os == 'macos' && 'macos' || 'linux' }}
+          asset_content_type: application/octet-stream

@@ -13,6 +13,7 @@ chrono = "0.4.38"
 serde_json = { version = "1.0.116", features = ["preserve_order"] }
 serde = { version = "1.0.198", features = ["derive"] }
 cli-clipboard = "0.4.0"
+dirs = "5.0.1"
 
 [profile.release]
 opt-level = 3
