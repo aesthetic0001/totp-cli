@@ -1,0 +1,24 @@
+name: Build Project
+
+on:
+  push:
+    branches: [ "main" ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v3
+      - name: Build
+        run: cargo build --release --verbose
+      - name: Upload Release
+        uses: upload-artifact@v4
+        with:
+          name: ${{ runner.os }}-build
+          path: target/release/totp
