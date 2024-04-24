@@ -28,6 +28,7 @@ jobs:
             name: release
             path: release.txt
   build:
+    needs: create_release
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
