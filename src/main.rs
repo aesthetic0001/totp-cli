@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::process::exit;
 use clap::{Parser, Subcommand};
 use serde::{Deserialize, Serialize};
 
@@ -17,8 +18,8 @@ trait TotpHotp {
 #[derive(Debug, Default, Serialize, Deserialize)]
 struct Key {
     secret: String,
-    size: u8,
-    period: u64
+    digits: u8,
+    period: u8
 }
 
 #[derive(Subcommand, Debug)]
@@ -26,12 +27,13 @@ enum SubCommand {
     Add {
         #[clap(long, short = 'k')]
         key: String,
+        // no way to specify a default value for a string conditionally based on whether input for key includes otpauth://
         #[clap(long, short = 'n')]
         name: String,
         #[clap(long, short = 's', default_value_t = 6)]
         size: u8,
         #[clap(long, short = 'p', default_value_t = 30)]
-        period: u64
+        period: u8
     },
     Remove {
         #[clap(long, short = 'n')]
@@ -57,11 +59,11 @@ impl TotpHotp for Key {
             | (u32::from(hmac[offset + 1]) & 0xff) << 16
             | (u32::from(hmac[offset + 2]) & 0xff) << 8
             | (u32::from(hmac[offset + 3]) & 0xff))
-            % 10u32.pow(u32::from(self.size));
-        format!("{:01$}", code, self.size as usize)
+            % 10u32.pow(u32::from(self.digits));
+        format!("{:01$}", code, self.digits as usize)
     }
     fn get_totp(&self) -> String {
-        self.get_hotp((chrono::Utc::now().timestamp() as u64) / &self.period)
+        self.get_hotp((chrono::Utc::now().timestamp() as u64) / self.period as u64)
     }
 }
 
@@ -82,10 +84,35 @@ fn main() {
                 eprintln!("TOTP for {} already exists!", name);
                 return;
             }
-            accounts.insert(name, Key { secret: key, size, period });
+            if key.starts_with("otpauth://") {
+                let uri = url::Url::parse(&key).unwrap();
+                let mode = uri.host_str().unwrap();
+                assert_eq!(mode, "totp");
+                let name = uri.path();
+                let secret = match uri.query_pairs().find(|(k, _)| k == "secret") {
+                    Some((_, v)) => v.to_string(),
+                    None => {
+                        println!("No secret found!");
+                        exit(1)
+                    }
+                };
+                let digits = match uri.query_pairs().find(|(k, _)| k == "digits") {
+                    Some((_, v)) => v.parse::<u8>().unwrap(),
+                    None => 6u8
+                };
+                let period = match uri.query_pairs().find(|(k, _)| k == "period") {
+                    Some((_, v)) => v.parse::<u8>().unwrap(),
+                    None => 30u8
+                };
+                let chars = name.chars().collect::<Vec<char>>();
+                let name = chars[1..].iter().collect::<String>();
+                accounts.insert(name, Key { secret, digits: digits, period });
+            } else {
+                accounts.insert(name, Key { secret: key, digits: size, period });
+            }
+            println!("TOTP added!");
             let json = serde_json::to_string(&accounts).unwrap();
             std::fs::write(&save_path, json).unwrap();
-            println!("TOTP added!");
         },
         SubCommand::Remove { name } => {
             if accounts.remove(&name).is_none() {
@@ -98,7 +125,7 @@ fn main() {
         },
         SubCommand::List {} => {
             for (name, key) in accounts.iter() {
-                println!("{}: {} (next code in {}s)", name, key.get_totp(), key.period - (chrono::Utc::now().timestamp() as u64) % key.period);
+                println!("{}: {} (next code in {}s)", name, key.get_totp(), key.period as u64 - (chrono::Utc::now().timestamp() as u64) % key.period as u64);
             }
         },
         SubCommand::Get { name } => {
