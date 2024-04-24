@@ -1,0 +1,20 @@
+[package]
+name = "totp"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+base32 = "0.4.0"
+clap = { version = "4.5.4", features = ["derive"] }
+hmac-sha1 = "0.2.2"
+chrono = "0.4.38"
+serde_json = { version = "1.0.116", features = ["preserve_order"] }
+serde = { version = "1.0.198", features = ["derive"] }
+cli-clipboard = "0.4.0"
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
