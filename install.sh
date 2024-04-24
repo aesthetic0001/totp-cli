@@ -1,4 +1,23 @@
-#get latest asset from https://api.github.com/repos/aesthetic0001/totp-cli/releases/latest
+#!/bin/sh
+
+# Check if jq is installed
+if ! command -v jq >/dev/null 2>&1; then
+    echo "jq is not installed. Attempting to install..."
+
+    # Detect the package manager and install jq
+    if command -v apt-get >/dev/null 2>&1; then
+        sudo apt-get update && sudo apt-get install -y jq
+    elif command -v yum >/dev/null 2>&1; then
+        sudo yum install -y jq
+    elif command -v brew >/dev/null 2>&1; then
+        brew install jq
+    else
+        echo "No known package manager found. Please install jq manually."
+        exit 1
+    fi
+else
+    echo "jq is already installed."
+fi
 
 # Get the latest release from the GitHub API
 latest_release=$(curl -s https://api.github.com/repos/aesthetic0001/totp-cli/releases/latest)
