@@ -2,6 +2,12 @@
 
 A simple CLI tool to store 2FA tokens and retrieve time based OTPs when needed
 
+### Installation on mac/linux
+
+```bash
+curl -s https://raw.githubusercontent.com/aesthetic0001/totp-cli/main/install.sh | bash
+```
+
 ### Usage
 
 ```bash
