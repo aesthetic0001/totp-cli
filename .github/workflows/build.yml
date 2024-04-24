@@ -22,4 +22,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ runner.os }}-build
-          path: target/release/totp
+#          handle .exe extension on windows
+          path: target/release/${{ runner.os == 'Windows' && 'totp.exe' || 'totp' }}
