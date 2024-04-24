@@ -18,4 +18,4 @@ jobs:
           release_name: Build ${{ github.run_number }}
           body: Build for run \#${{ github.run_number }}
           draft: false
-          prerelease: false
+          prerelease: true

@@ -2,7 +2,7 @@ name: Build Project
 
 on:
   release:
-    types: [published]
+    types: [created]
 
 env:
   CARGO_TERM_COLOR: always
