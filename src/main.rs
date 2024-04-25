@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::path::PathBuf;
 use std::process::exit;
 use clap::{Parser, Subcommand};
 use serde::{Deserialize, Serialize};
@@ -43,6 +44,16 @@ enum SubCommand {
     Get {
         #[clap(long, short = 'n')]
         name: String
+    },
+    Import {
+        #[clap(long, short = 'f')]
+        file: PathBuf
+    },
+    Rename {
+        #[clap(long, short = 'o')]
+        old: String,
+        #[clap(long, short = 'n')]
+        new: String
     }
 }
 
@@ -67,6 +78,33 @@ impl TotpHotp for Key {
     }
 }
 
+fn parse_otpauth(url: String) -> (String, Key) {
+    let uri = url::Url::parse(&url).unwrap();
+    let mode = uri.host_str().unwrap();
+    assert_eq!(mode, "totp");
+    let name = uri.path();
+    let secret = match uri.query_pairs().find(|(k, _)| k == "secret") {
+        Some((_, v)) => v.to_string(),
+        None => {
+            println!("No secret found!");
+            exit(1)
+        }
+    };
+    let digits = match uri.query_pairs().find(|(k, _)| k == "digits") {
+        Some((_, v)) => v.parse::<u8>().unwrap(),
+        None => 6u8
+    };
+    let period = match uri.query_pairs().find(|(k, _)| k == "period") {
+        Some((_, v)) => v.parse::<u8>().unwrap(),
+        None => 30u8
+    };
+    let chars = name.chars().collect::<Vec<char>>();
+    let name = chars[1..].iter().collect::<String>();
+    // make sure that name gets rid of the url encoded characters
+    let name = urlencoding::decode(&name).unwrap();
+    (name.parse().unwrap(), Key { secret, digits, period })
+}
+
 fn main() {
     let install_dir = dirs::home_dir().unwrap().join(".totp");
     if !install_dir.exists() {
@@ -85,28 +123,12 @@ fn main() {
                 return;
             }
             if key.starts_with("otpauth://") {
-                let uri = url::Url::parse(&key).unwrap();
-                let mode = uri.host_str().unwrap();
-                assert_eq!(mode, "totp");
-                let name = uri.path();
-                let secret = match uri.query_pairs().find(|(k, _)| k == "secret") {
-                    Some((_, v)) => v.to_string(),
-                    None => {
-                        println!("No secret found!");
-                        exit(1)
-                    }
-                };
-                let digits = match uri.query_pairs().find(|(k, _)| k == "digits") {
-                    Some((_, v)) => v.parse::<u8>().unwrap(),
-                    None => 6u8
-                };
-                let period = match uri.query_pairs().find(|(k, _)| k == "period") {
-                    Some((_, v)) => v.parse::<u8>().unwrap(),
-                    None => 30u8
-                };
-                let chars = name.chars().collect::<Vec<char>>();
-                let name = chars[1..].iter().collect::<String>();
-                accounts.insert(name, Key { secret, digits: digits, period });
+                let (name, key) = parse_otpauth(key);
+                if accounts.contains_key(&name) {
+                    eprintln!("TOTP for {} already exists!", name);
+                    return;
+                }
+                accounts.insert(name, key);
             } else {
                 accounts.insert(name, Key { secret: key, digits: size, period });
             }
@@ -134,6 +156,35 @@ fn main() {
                 cli_clipboard::set_contents(key.get_totp()).unwrap();
             } else {
                 eprintln!("{} does not exist!", name);
+            }
+        }
+        SubCommand::Import { file } => {
+            let file = std::fs::read_to_string(file).unwrap();
+            let lines = file.lines();
+            let mut ctr = 0;
+            for line in lines {
+                if line.starts_with("otpauth://") {
+                    let (name, key) = parse_otpauth(line.to_string());
+                    if accounts.contains_key(&name) {
+                        eprintln!("TOTP for {} already exists!", name);
+                        return;
+                    }
+                    accounts.insert(name, key);
+                    ctr += 1;
+                }
+            }
+            let json = serde_json::to_string(&accounts).unwrap();
+            std::fs::write(&save_path, json).unwrap();
+            println!("Successfully imported {} TOTP values!", ctr);
+        },
+        SubCommand::Rename { old, new } => {
+            if let Some(key) = accounts.remove(&old) {
+                accounts.insert(new.clone(), key);
+                let json = serde_json::to_string(&accounts).unwrap();
+                std::fs::write(&save_path, json).unwrap();
+                println!("Successfully renamed {} to {}!", old, new);
+            } else {
+                eprintln!("{} does not exist!", old);
             }
         }
     }
